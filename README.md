@@ -1,1 +1,1 @@
-# go-infra
+# go-simple
