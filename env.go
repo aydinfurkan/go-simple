@@ -1,35 +1,19 @@
 package simple
 
 import (
+	"fmt"
 	"os"
 	"strconv"
 	"strings"
-
-	"github.com/joho/godotenv"
 )
-
-var envLoadedBefore = false
-
-func LazyLoadEnv() {
-	if envLoadedBefore {
-		return
-	}
-
-	if err := godotenv.Load(); err != nil {
-		if !os.IsNotExist(err) {
-			panic(err)
-		}
-	}
-	envLoadedBefore = true
-}
 
 type Env struct {
 	Key   string
-	Value string
+	Value any
 }
 
 func GetEnv(key string) *Env {
-	LazyLoadEnv()
+	lazyInit()
 
 	if value, exists := os.LookupEnv(key); exists {
 		return &Env{
@@ -37,93 +21,131 @@ func GetEnv(key string) *Env {
 			Value: value,
 		}
 	}
-	return nil
+
+	return &Env{
+		Key:   key,
+		Value: nil,
+	}
 }
 
-func GetEnvOrThrow(key string) *Env {
-	if env := GetEnv(key); env != nil {
-		return env
+func (e *Env) Default(v interface{}) *Env {
+
+	if e.Value == nil {
+		e.Value = v
 	}
-	panic("Environment variable " + key + " not found")
+
+	return e
 }
 
-func (e *Env) AsString(defaultValue string) string {
-	if e == nil {
-		return defaultValue
+func (e *Env) AsString() string {
+	if e.Value == nil {
+		panic(fmt.Sprintf("Environment variable %s not found on env or default value is not set", e.Key))
 	}
-	if e.Value != "" {
-		return e.Value
+	if v, ok := e.Value.(string); ok {
+		return v
 	}
-	return defaultValue
+	panic(fmt.Sprintf("Environment variable %s is not a string", e.Key))
 }
 
-func (e *Env) AsInt(defaultValue int) int {
-	if e == nil {
-		return defaultValue
+func (e *Env) AsInt() int {
+	if e.Value == nil {
+		panic(fmt.Sprintf("Environment variable %s not found on env or default value is not set", e.Key))
 	}
 
-	if intValue, err := strconv.Atoi(e.Value); err == nil {
-		return intValue
+	if v, ok := e.Value.(int); ok {
+		return v
 	}
-	return defaultValue
+
+	if v, ok := e.Value.(string); ok {
+		if intValue, err := strconv.Atoi(v); err == nil {
+			return intValue
+		}
+	}
+
+	panic(fmt.Sprintf("Environment variable %s is not an int", e.Key))
 }
 
-func (e *Env) AsInt64(defaultValue int64) int64 {
-	if e == nil {
-		return defaultValue
+func (e *Env) AsInt64() int64 {
+	if e.Value == nil {
+		panic(fmt.Sprintf("Environment variable %s not found on env or default value is not set", e.Key))
 	}
 
-	if intValue, err := strconv.ParseInt(e.Value, 10, 64); err == nil {
-		return intValue
+	if v, ok := e.Value.(int64); ok {
+		return v
 	}
-	return defaultValue
+
+	if v, ok := e.Value.(string); ok {
+		if intValue, err := strconv.ParseInt(v, 10, 64); err == nil {
+			return intValue
+		}
+	}
+
+	panic(fmt.Sprintf("Environment variable %s is not an int64", e.Key))
 }
 
-func (e *Env) AsFloat64(defaultValue float64) float64 {
-	if e == nil {
-		return defaultValue
+func (e *Env) AsFloat64() float64 {
+	if e.Value == nil {
+		panic(fmt.Sprintf("Environment variable %s not found on env or default value is not set", e.Key))
 	}
 
-	if floatValue, err := strconv.ParseFloat(e.Value, 64); err == nil {
-		return floatValue
+	if v, ok := e.Value.(float64); ok {
+		return v
 	}
-	return defaultValue
+
+	if v, ok := e.Value.(string); ok {
+		if floatValue, err := strconv.ParseFloat(v, 64); err == nil {
+			return floatValue
+		}
+	}
+
+	panic(fmt.Sprintf("Environment variable %s is not a float64", e.Key))
 }
 
-func (e *Env) AsBool(defaultValue bool) bool {
-	if e == nil {
-		return defaultValue
+func (e *Env) AsBool() bool {
+	if e.Value == nil {
+		panic(fmt.Sprintf("Environment variable %s not found on env or default value is not set", e.Key))
 	}
 
-	if boolValue, err := strconv.ParseBool(e.Value); err == nil {
-		return boolValue
+	if v, ok := e.Value.(bool); ok {
+		return v
 	}
-	return defaultValue
+
+	if v, ok := e.Value.(string); ok {
+		if boolValue, err := strconv.ParseBool(v); err == nil {
+			return boolValue
+		}
+	}
+
+	panic(fmt.Sprintf("Environment variable %s is not a boolean", e.Key))
 }
 
-func (e *Env) AsBytes(defaultValue string) []byte {
-	if e == nil {
-		return []byte(defaultValue)
+func (e *Env) AsBytes() []byte {
+	if e.Value == nil {
+		panic(fmt.Sprintf("Environment variable %s not found on env or default value is not set", e.Key))
 	}
-	if e.Value != "" {
-		return []byte(e.Value)
+
+	if v, ok := e.Value.(string); ok {
+		return []byte(v)
 	}
-	return []byte(defaultValue)
+
+	panic(fmt.Sprintf("Environment variable %s cannot be converted to bytes", e.Key))
 }
 
-func (e *Env) GetEnvAsStrings(defaultValue string, seperator string) []string {
-
-	var v string
-
-	if e == nil {
-		v = defaultValue
-	} else {
-		v = e.Value
+func (e *Env) GetEnvAsStrings(separator string) []string {
+	if e.Value == nil {
+		panic(fmt.Sprintf("Environment variable %s not found on env or default value is not set", e.Key))
 	}
 
-	slc := strings.Split(v, seperator)
-	for i := range slc {
-		slc[i] = strings.TrimSpace(slc[i])
+	if v, ok := e.Value.(string); ok {
+		if v == "" {
+			return []string{}
+		}
+		slc := strings.Split(v, separator)
+		for i := range slc {
+			slc[i] = strings.TrimSpace(slc[i])
+		}
+		return slc
 	}
-	return slc
+
+	panic(fmt.Sprintf("Environment variable %s cannot be converted to string slice", e.Key))
 }
